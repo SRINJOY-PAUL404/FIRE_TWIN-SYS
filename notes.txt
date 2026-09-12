@@ -1,0 +1,13 @@
+# FireTwin AI Credentials
+
+1. Super Admin:
+mail_id : admin@firetwin.edu
+pass    : joy9123
+
+2. Campus Safety Officer (Admin):
+mail_id : operator@firetwin.edu
+pass    : operator123
+
+3. Lead Technician:
+mail_id : tech@firetwin.edu
+pass    : tech123

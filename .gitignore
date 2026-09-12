@@ -1,0 +1,50 @@
+# Dependencies
+backend/venv/
+backend/__pycache__/
+backend/*.py[cod]
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+backend/*.egg-info/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backend/firetwin.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.prod
+backend/.env
+frontend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+docker-compose.override.yml
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+coverage/
+
+# Misc
+*.md
+!README.md

@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: firetwin_db
+    environment:
+      POSTGRES_USER: firetwin
+      POSTGRES_PASSWORD: firetwin_password
+      POSTGRES_DB: firetwin_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: firetwin_mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: firetwin_backend
+    environment:
+      DATABASE_URL: postgresql://firetwin:firetwin_password@db/firetwin_db
+      MQTT_BROKER: mqtt
+      MQTT_PORT: 1883
+      SECRET_KEY: "supersecretkey_change_in_production"
+      ALGORITHM: "HS256"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - mqtt
+    volumes:
+      - ./backend:/app
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: firetwin_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=http://localhost:8000
+    restart: always
+
+volumes:
+  postgres_data:

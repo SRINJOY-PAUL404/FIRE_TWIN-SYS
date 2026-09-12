@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@import "tailwindcss";
+
+@theme {
+  /* Command Room Strict Tokens */
+  --color-command-bg: #14161A;
+  --color-command-panel: #1C1F26;
+  --color-command-border: #2A2E37;
+  
+  --color-blueprint-bg: #0F2A4A;
+  --color-blueprint-line: rgba(255, 255, 255, 0.15);
+  --color-blueprint-cyan: #00E5FF;
+  
+  --color-tech-bg: #FBF7F2;
+  --color-tech-green: #3F6B4F;
+  --color-tech-terra: #C97A5B;
+
+  --color-amber-alert: #E8A33D;
+  --color-red-critical: #E24C4C;
+  --color-steel-blue: #5C7A99;
+  --color-success-teal: #3FBF6E;
+
+  --font-nav: 'Barlow Condensed', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-command-bg);
+  color: #E2E8F0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light mode override for technician view only */
+.tech-mode {
+  background-color: var(--color-tech-bg);
+  color: #1A202C;
+}
+
+/* Blueprint mode for specific views */
+.blueprint-mode {
+  background-color: var(--color-blueprint-bg);
+  background-image: 
+    linear-gradient(var(--color-blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-blueprint-line) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* Strict resets: No shadows, no radii overrides */
+* {
+  box-shadow: none !important;
+}
+
+/* Scrollbar styles for command interface */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-command-bg);
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-command-border);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-steel-blue);
+}
+
+/* Mapbox GL Marker animations */
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
