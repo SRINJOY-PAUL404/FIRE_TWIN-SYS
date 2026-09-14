@@ -104,6 +104,20 @@ async def simulate_iot_events():
 async def lifespan(app: FastAPI):
     # Startup
     init_db_schema()
+    # Auto-seed if database is empty (first deploy / data reset)
+    try:
+        from database import SessionLocal
+        import models
+        db = SessionLocal()
+        user_count = db.query(models.User).count()
+        db.close()
+        if user_count == 0:
+            print("[Startup] Empty database detected — running seed...")
+            from seed import seed_data
+            seed_data()
+            print("[Startup] Seed complete.")
+    except Exception as e:
+        print(f"[Startup] Auto-seed skipped: {e}")
     task = asyncio.create_task(simulate_iot_events())
     yield
     # Shutdown
