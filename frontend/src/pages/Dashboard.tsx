@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getExtinguishers, getLocations, getRecentTelemetry } from '../api';
+import { WS_URL } from '../env';
 import type { Extinguisher, Location } from '../types';
 import { Flame, Activity, ShieldAlert, Wrench, Archive, MapPin, Radio, Wifi, WifiOff } from 'lucide-react';
 import { Doughnut } from 'react-chartjs-2';
@@ -37,8 +38,7 @@ const Dashboard = () => {
     // WebSocket setup with resilient auto-reconnect
     const connectWs = () => {
       setWsStatus('CONNECTING');
-      const wsUrl = `ws://${window.location.hostname || 'localhost'}:8000/ws`;
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {

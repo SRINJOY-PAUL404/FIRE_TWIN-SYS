@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Bell, Activity, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { WS_URL } from '../env';
 
 const Navbar: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -9,8 +10,7 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const wsUrl = `ws://${window.location.hostname || 'localhost'}:8000/ws`;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(WS_URL);
     ws.onopen = () => setIsConnected(true);
     ws.onclose = () => setIsConnected(false);
     return () => ws.close();

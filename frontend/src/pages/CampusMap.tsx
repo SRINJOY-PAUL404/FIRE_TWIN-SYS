@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getExtinguishers, getLocations } from '../api';
+import { WS_URL } from '../env';
 import type { Extinguisher } from '../types';
 import { MapboxCampusMap } from '../components/MapboxCampusMap';
 import { Campus3DView } from '../components/campus3d/Campus3DView';
@@ -16,8 +17,7 @@ const CampusMap = () => {
     getExtinguishers().then(data => setExtinguishers(data)).catch(console.error);
     getLocations().then(data => setLocations(data)).catch(console.error);
 
-    const wsUrl = `ws://${window.location.hostname || 'localhost'}:8000/ws`;
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(WS_URL);
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);

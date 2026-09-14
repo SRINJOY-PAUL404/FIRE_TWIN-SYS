@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useResourceList } from '../../hooks/useResourceList';
 import { Trash, AlertCircle, Key, Copy, Check } from 'lucide-react';
+import { api } from '../../api';
 
 interface ApiKey {
   id: number;
@@ -25,17 +26,10 @@ export const ApiKeysTab = () => {
     setCopied(false);
     
     try {
-        const response = await fetch('http://localhost:8000/api-keys/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newKeyName })
-        });
-        if (response.ok) {
-            const data = await response.json();
-            setLastCreatedKey(data.full_key);
-            setNewKeyName('');
-            refetch();
-        }
+        const response = await api.post('/api-keys/', { name: newKeyName });
+        setLastCreatedKey(response.data.full_key);
+        setNewKeyName('');
+        refetch();
     } catch(err) {
         console.error(err);
     }

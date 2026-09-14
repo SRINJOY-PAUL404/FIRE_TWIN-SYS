@@ -1,7 +1,6 @@
 import axios from 'axios';
 import type { Extinguisher, MaintenanceLog, Location, AdminUser } from './types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname || 'localhost'}:8000`;
+import { API_BASE_URL } from './env';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
