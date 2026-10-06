@@ -12,19 +12,24 @@ import random
 
 def init_db_schema():
     from database import engine
-    from sqlalchemy import text
+    from sqlalchemy import text, inspect
     with engine.connect() as conn:
         try:
-            columns = [row[1] for row in conn.execute(text("PRAGMA table_info(users);")).fetchall()]
-            if "status" not in columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR DEFAULT 'active';"))
-            if "created_at" not in columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN created_at DATETIME;"))
-            if "last_login_at" not in columns:
-                conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME;"))
-            iot_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(iot_readings);")).fetchall()]
-            if "battery" not in iot_columns:
-                conn.execute(text("ALTER TABLE iot_readings ADD COLUMN battery FLOAT DEFAULT 100.0;"))
+            inspector = inspect(engine)
+            # Sync users table columns
+            if inspector.has_table("users"):
+                user_cols = {col["name"] for col in inspector.get_columns("users")}
+                if "status" not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR DEFAULT 'active';"))
+                if "created_at" not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN created_at TIMESTAMP;"))
+                if "last_login_at" not in user_cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP;"))
+            # Sync iot_readings table columns
+            if inspector.has_table("iot_readings"):
+                iot_cols = {col["name"] for col in inspector.get_columns("iot_readings")}
+                if "battery" not in iot_cols:
+                    conn.execute(text("ALTER TABLE iot_readings ADD COLUMN battery FLOAT DEFAULT 100.0;"))
             conn.commit()
         except Exception as e:
             print(f"[DB Init] Schema sync notice: {e}")
@@ -130,13 +135,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration with credentials support for cookies
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-origins = [origin.strip() for origin in cors_origins.split(",")]
-
+# CORS configuration — allow all origins for tunnel/dev access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

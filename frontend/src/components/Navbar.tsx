@@ -1,25 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Bell, Activity, LogOut, Shield } from 'lucide-react';
+import React from 'react';
+import { Search, Bell, Activity, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { WS_URL } from '../env';
 
 const Navbar: React.FC = () => {
-  const [isConnected, setIsConnected] = useState(false);
-  const { user, logout, isSuperAdmin } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const ws = new WebSocket(WS_URL);
-    ws.onopen = () => setIsConnected(true);
-    ws.onclose = () => setIsConnected(false);
-    return () => ws.close();
-  }, []);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
+  const { user, isSuperAdmin } = useAuth();
 
   const roleLabel = isSuperAdmin
     ? 'SUPER ADMIN'
@@ -48,18 +32,12 @@ const Navbar: React.FC = () => {
         {/* Connection Status */}
         <div className="flex items-center space-x-2 font-[var(--font-mono)] text-xs">
           <span className="text-[var(--color-steel-blue)] hidden sm:inline">SYS_CONN:</span>
-          {isConnected ? (
             <span className="text-[var(--color-success-teal)] flex items-center">
               <Activity className="w-3 h-3 mr-1" /> LIVE
             </span>
-          ) : (
-            <span className="text-[var(--color-red-critical)] flex items-center">
-              <Activity className="w-3 h-3 mr-1" /> OFFLINE
-            </span>
-          )}
         </div>
 
-        {/* Dynamic Admin Badge & Name */}
+        {/* Admin Badge & Name */}
         <div className="flex items-center space-x-2 border-l border-[var(--color-command-border)] pl-4">
           <div className="text-right">
             <div className="font-[var(--font-nav)] text-xs tracking-widest text-[#E2E8F0] uppercase font-bold flex items-center gap-1">
@@ -75,15 +53,6 @@ const Navbar: React.FC = () => {
         <button className="p-1 relative text-[var(--color-steel-blue)] hover:text-[#E2E8F0]" title="Notifications">
           <Bell className="h-4 w-4" />
           <span className="absolute top-0 right-0 block h-1.5 w-1.5 rounded-none bg-[var(--color-amber-alert)]"></span>
-        </button>
-
-        {/* Logout Action */}
-        <button
-          onClick={handleLogout}
-          className="p-1.5 text-[var(--color-steel-blue)] hover:text-[var(--color-red-critical)] border border-[var(--color-command-border)] hover:border-[var(--color-red-critical)]/60 transition-colors cursor-pointer"
-          title="Sign Out of Session"
-        >
-          <LogOut className="h-4 w-4" />
         </button>
       </div>
     </header>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Map, 
@@ -7,18 +7,15 @@ import {
   Bell, 
   Wrench,
   Settings,
-  LogOut
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
-import { SIDEBAR_ACCESS, hasAccess } from '../rbac';
 
 const Sidebar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   
-  const allNavItems = [
+  const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Campus Map', path: '/map', icon: Map },
     { name: 'Extinguishers', path: '/extinguishers', icon: Flame },
@@ -26,18 +23,6 @@ const Sidebar = () => {
     { name: 'Maintenance', path: '/maintenance', icon: Wrench },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
-
-  // Filter nav items based on user role
-  const navItems = allNavItems.filter(item => {
-    const allowedRoles = SIDEBAR_ACCESS[item.path];
-    if (!allowedRoles) return true;
-    return hasAccess(user?.role, allowedRoles);
-  });
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
 
   const getInitials = (name?: string, email?: string) => {
     if (name) {
@@ -97,9 +82,9 @@ const Sidebar = () => {
         })}
       </nav>
       
-      {/* Dynamic Logged-in Admin Footer */}
+      {/* Admin Footer */}
       <div className="p-3.5 border-t border-[var(--color-command-border)] bg-[var(--color-command-panel)]">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <div className="flex items-center min-w-0">
             <div className="w-8 h-8 bg-[var(--color-command-bg)] flex-shrink-0 flex items-center justify-center text-[var(--color-amber-alert)] font-[var(--font-mono)] text-xs font-bold border border-[var(--color-command-border)]">
               {initials}
@@ -113,13 +98,6 @@ const Sidebar = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-1.5 text-[var(--color-steel-blue)] hover:text-[var(--color-red-critical)] transition-colors ml-1"
-            title="Log Out"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
     </aside>

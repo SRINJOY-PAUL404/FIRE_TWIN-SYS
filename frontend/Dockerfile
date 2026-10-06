@@ -6,6 +6,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+# Accept build-time variables for Vite (baked into the static bundle)
+ARG VITE_API_URL
+ARG VITE_MAPBOX_TOKEN
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+
 COPY . .
 RUN npm run build
 

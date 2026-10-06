@@ -7,97 +7,10 @@ export const api = axios.create({
   withCredentials: true, // Send and receive httpOnly cookies for refresh token
 });
 
-// In-memory access token storage (reduces XSS risk compared to localStorage)
-let inMemoryAccessToken: string | null = null;
+// Auth disabled — no token management needed
+export const setAuthToken = (_token: string | null) => {};
+export const getAuthToken = (): string | null => null;
 
-export const setAuthToken = (token: string | null) => {
-  inMemoryAccessToken = token;
-};
-
-export const getAuthToken = (): string | null => {
-  return inMemoryAccessToken;
-};
-
-// Request Interceptor: Attach in-memory JWT Access Token
-api.interceptors.request.use((config) => {
-  if (inMemoryAccessToken) {
-    config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
-  }
-  return config;
-});
-
-// Response Interceptor: Silent refresh on 401
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: any) => void }> = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else if (token) {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    // Skip retry on login, register, or refresh endpoints to avoid infinite loops
-    const isAuthRoute =
-      originalRequest.url?.includes('/api/auth/login') ||
-      originalRequest.url?.includes('/api/auth/register') ||
-      originalRequest.url?.includes('/api/auth/refresh') ||
-      originalRequest.url?.includes('/auth/login') ||
-      originalRequest.url?.includes('/auth/register') ||
-      originalRequest.url?.includes('/auth/refresh');
-
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const refreshResponse = await axios.post(
-          `${API_BASE_URL}/auth/refresh`,
-          {},
-          { withCredentials: true }
-        );
-
-        const newAccessToken = refreshResponse.data.access_token;
-        setAuthToken(newAccessToken);
-        processQueue(null, newAccessToken);
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        return api(originalRequest);
-      } catch (refreshErr) {
-        processQueue(refreshErr, null);
-        setAuthToken(null);
-        // Force redirect to login on refresh failure
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-        return Promise.reject(refreshErr);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
 
 // -------------------------------------------------------------
 // Core API Calls

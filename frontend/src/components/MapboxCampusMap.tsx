@@ -20,8 +20,18 @@ import {
   Sliders,
   Copy,
   Trash2,
-  Check
+  Check,
+  Building2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
+import { CAMPUS_BOUNDARY_GEOJSON } from '../constants/campusBoundary';
+import {
+  classifyExtinguishers,
+  groupExtinguishersByBuilding,
+  isBuildingInsideCampus,
+  type BuildingGroupMap,
+} from '../utils/campusFiltering';
 
 interface MapboxCampusMapProps {
   extinguishers: Extinguisher[];
@@ -228,11 +238,27 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [showOutOfCampus, setShowOutOfCampus] = useState(false);
 
   // Filter active deployed units
   const activeExtinguishers = useMemo(() => {
     return extinguishers.filter(e => e.lifecycle_state === 'ACTIVE' && e.latitude && e.longitude);
   }, [extinguishers]);
+
+  // Campus boundary classification
+  const campusClassification = useMemo(() => {
+    return classifyExtinguishers(extinguishers);
+  }, [extinguishers]);
+
+  // Building groups with status summaries
+  const buildingGroups = useMemo(() => {
+    return groupExtinguishersByBuilding(extinguishers);
+  }, [extinguishers]);
+
+  // Only campus-interior buildings
+  const campusBuildings = useMemo(() => {
+    return CAMPUS_BUILDINGS.filter(b => isBuildingInsideCampus(b));
+  }, []);
 
   // Helper to get location and building name
   const getLocationInfo = useCallback((locId: number | null) => {
@@ -378,6 +404,40 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
           },
         });
       }
+
+      // 4. Campus Boundary Polygon — dashed outline
+      if (!map.getSource('campus-boundary')) {
+        map.addSource('campus-boundary', {
+          type: 'geojson',
+          data: CAMPUS_BOUNDARY_GEOJSON as any,
+        });
+      }
+
+      if (!map.getLayer('campus-boundary-fill')) {
+        map.addLayer({
+          id: 'campus-boundary-fill',
+          type: 'fill',
+          source: 'campus-boundary',
+          paint: {
+            'fill-color': '#22d3ee',
+            'fill-opacity': 0.06,
+          },
+        });
+      }
+
+      if (!map.getLayer('campus-boundary-line')) {
+        map.addLayer({
+          id: 'campus-boundary-line',
+          type: 'line',
+          source: 'campus-boundary',
+          paint: {
+            'line-color': '#22d3ee',
+            'line-width': 2.5,
+            'line-opacity': 0.7,
+            'line-dasharray': [4, 3],
+          },
+        });
+      }
     } catch (err) {
       console.warn('[MapboxCampusMap] Failed to setup building layers:', err);
     }
@@ -388,19 +448,27 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
     if (!mapRef.current || !isMapLoaded) return;
     const map = mapRef.current;
 
-    // Filter units based on active UI filters
-    const filteredUnits = activeExtinguishers.filter(ext => {
+    // Build set of in-campus unit IDs for fast lookup
+    const inCampusIds = new Set(campusClassification.inCampus.map(e => e.id));
+
+    // Determine which units to render
+    let unitsToRender = activeExtinguishers.filter(ext => {
+      const isInCampus = inCampusIds.has(ext.id);
+
+      // Out-of-campus units only shown if toggle is on
+      if (!isInCampus && !showOutOfCampus) return false;
+
       const locInfo = getLocationInfo(ext.location_id);
-      
+
       const matchBuilding = selectedBuilding === 'ALL' || locInfo.buildingName === selectedBuilding;
-      const matchStatus = 
-        selectedStatus === 'ALL' || 
+      const matchStatus =
+        selectedStatus === 'ALL' ||
         (selectedStatus === 'HEALTHY' && ext.status === 'Healthy') ||
         (selectedStatus === 'ATTENTION' && (ext.status === 'Low Pressure' || ext.status === 'Maintenance Due')) ||
         (selectedStatus === 'CRITICAL' && (ext.status === 'Emergency' || ext.status === 'Missing' || ext.status === 'Inspection Pending'));
-      
-      const matchSearch = 
-        !searchQuery || 
+
+      const matchSearch =
+        !searchQuery ||
         ext.extinguisher_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (ext.room ? ext.room.toLowerCase().includes(searchQuery.toLowerCase()) : false) ||
         locInfo.buildingName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -408,7 +476,7 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
       return matchBuilding && matchStatus && matchSearch;
     });
 
-    const currentMarkerIds = new Set(filteredUnits.map(u => u.id));
+    const currentMarkerIds = new Set(unitsToRender.map(u => u.id));
 
     // Remove markers that no longer match the filter
     markersMapRef.current.forEach((marker, id) => {
@@ -419,18 +487,31 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
     });
 
     // Add or update markers in-place
-    filteredUnits.forEach(ext => {
+    unitsToRender.forEach(ext => {
       if (!ext.latitude || !ext.longitude) return;
 
+      const isInCampus = inCampusIds.has(ext.id);
       const isCrit = ext.status === 'Emergency' || ext.status === 'Missing' || ext.id === emergencyExtinguisherId;
       const isWarn = ext.status === 'Low Pressure' || ext.status === 'Maintenance Due';
-      
-      const pinColor = isCrit ? '#ef4444' : isWarn ? '#f59e0b' : '#10b981';
+
+      // In-campus: normal status colors; Out-of-campus: grayed out
+      const pinColor = !isInCampus
+        ? '#64748b' // slate-500 gray for out-of-campus
+        : isCrit ? '#ef4444' : isWarn ? '#f59e0b' : '#10b981';
+      const pinOpacity = isInCampus ? 1 : 0.4;
+      const pinSize = isInCampus ? 14 : 10;
+      const showPulse = isInCampus && (isCrit || isWarn);
 
       let marker = markersMapRef.current.get(ext.id);
 
+      const markerHTML = `
+        <div style="position: relative; display: flex; align-items: center; justify-content: center; opacity: ${pinOpacity};">
+          <div style="width: ${pinSize}px; height: ${pinSize}px; border-radius: 50%; background-color: ${pinColor}; border: 2px solid ${isInCampus ? '#0f172a' : '#334155'}; box-shadow: 0 0 ${isInCampus ? 10 : 4}px ${pinColor}cc; z-index: 2;"></div>
+          ${showPulse ? `<div style="position: absolute; width: 26px; height: 26px; border-radius: 50%; background-color: ${pinColor}40; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; z-index: 1;"></div>` : ''}
+        </div>
+      `;
+
       if (!marker) {
-        // Create custom DOM marker element
         const el = document.createElement('div');
         el.className = 'mapbox-firetwin-marker cursor-pointer transition-transform hover:scale-125';
         el.style.width = '24px';
@@ -438,13 +519,7 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
-
-        el.innerHTML = `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-            <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${pinColor}; border: 2px solid #0f172a; box-shadow: 0 0 10px ${pinColor}cc; z-index: 2;"></div>
-            ${isCrit || isWarn ? `<div style="position: absolute; width: 26px; height: 26px; border-radius: 50%; background-color: ${pinColor}40; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; z-index: 1;"></div>` : ''}
-          </div>
-        `;
+        el.innerHTML = markerHTML;
 
         const popup = new maplibregl.Popup({ offset: 18, closeButton: true, maxWidth: '280px' });
 
@@ -458,26 +533,19 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
           if (onSelectExtinguisherRef.current) onSelectExtinguisherRef.current(ext);
 
           const locInfo = getLocationInfo(ext.location_id);
-          const content = renderPopupContent(ext, locInfo, pinColor);
+          const campusTag = isInCampus ? '' : '<div style="margin-top:4px; padding:2px 6px; background:#64748b20; color:#94a3b8; font-size:10px; font-weight:bold; text-align:center;">OUT OF CAMPUS</div>';
+          const content = renderPopupContent(ext, locInfo, pinColor) + campusTag;
           popup.setHTML(content);
           activePopupRef.current = popup;
         });
 
         markersMapRef.current.set(ext.id, marker);
       } else {
-        // Update marker coordinates in-place
         marker.setLngLat([ext.longitude, ext.latitude]);
 
-        // Update DOM element inner styling
         const el = marker.getElement();
-        el.innerHTML = `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-            <div style="width: 14px; height: 14px; border-radius: 50%; background-color: ${pinColor}; border: 2px solid #0f172a; box-shadow: 0 0 10px ${pinColor}cc; z-index: 2;"></div>
-            ${isCrit || isWarn ? `<div style="position: absolute; width: 26px; height: 26px; border-radius: 50%; background-color: ${pinColor}40; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; z-index: 1;"></div>` : ''}
-          </div>
-        `;
+        el.innerHTML = markerHTML;
 
-        // If popup is open for this unit, update live stats
         if (selectedUnitIdRef.current === ext.id && activePopupRef.current && activePopupRef.current.isOpen()) {
           const locInfo = getLocationInfo(ext.location_id);
           activePopupRef.current.setHTML(renderPopupContent(ext, locInfo, pinColor));
@@ -485,13 +553,15 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
       }
     });
   }, [
-    activeExtinguishers, 
-    selectedBuilding, 
-    selectedStatus, 
-    searchQuery, 
-    emergencyExtinguisherId, 
-    isMapLoaded, 
-    getLocationInfo, 
+    activeExtinguishers,
+    campusClassification,
+    selectedBuilding,
+    selectedStatus,
+    searchQuery,
+    showOutOfCampus,
+    emergencyExtinguisherId,
+    isMapLoaded,
+    getLocationInfo,
     renderPopupContent
   ]);
 
@@ -657,6 +727,9 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
           <div className="flex items-center px-2 py-1 text-xs font-[var(--font-mono)] text-[var(--color-steel-blue)] border-r border-[var(--color-command-border)]">
             <MapPin className="w-3.5 h-3.5 mr-1 text-[var(--color-amber-alert)]" />
             <span className="hidden sm:inline">CAMPUS:</span> <strong className="text-slate-200 ml-1">Brainware Univ.</strong>
+            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-bold">
+              {campusClassification.inCampus.length} IN
+            </span>
           </div>
 
           {/* Building Selector */}
@@ -682,10 +755,13 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
             }}
             className="bg-[var(--color-command-bg)] border border-[var(--color-command-border)] text-xs text-slate-200 font-[var(--font-mono)] px-2 py-1 focus:outline-none focus:border-[var(--color-amber-alert)]"
           >
-            <option value="ALL">All Buildings (6)</option>
-            {CAMPUS_BUILDINGS.map(b => (
-              <option key={b.id} value={b.name}>{b.name} ({b.floors} Fl)</option>
-            ))}
+            <option value="ALL">All Buildings ({campusBuildings.length} on campus)</option>
+            {campusBuildings.map(b => {
+              const group = buildingGroups[b.id];
+              return (
+                <option key={b.id} value={b.name}>{b.name} ({group?.status.total ?? 0} units)</option>
+              );
+            })}
           </select>
 
           {/* Status Filter */}
@@ -873,35 +949,88 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
         </div>
       )}
 
-      {/* Floating Campus Building Legend */}
-      <div className="absolute bottom-4 left-4 z-10 pointer-events-auto bg-[var(--color-command-panel)]/90 backdrop-blur-md border border-[var(--color-command-border)] p-3 shadow-xl max-w-xs hidden sm:block">
-        <div className="text-[10px] font-[var(--font-nav)] uppercase tracking-widest text-[var(--color-steel-blue)] border-b border-[var(--color-command-border)] pb-1 mb-2 flex justify-between">
-          <span>Campus Footprints</span>
-          <span>6 Buildings</span>
+      {/* Floating Building Sidebar — Unit Counts & Status Per Building */}
+      <div className="absolute bottom-4 left-4 z-10 pointer-events-auto bg-[var(--color-command-panel)]/90 backdrop-blur-md border border-[var(--color-command-border)] p-3 shadow-xl max-w-[280px] hidden sm:block">
+        <div className="text-[10px] font-[var(--font-nav)] uppercase tracking-widest text-[var(--color-steel-blue)] border-b border-[var(--color-command-border)] pb-1 mb-2 flex justify-between items-center">
+          <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> Campus Buildings</span>
+          <span className="text-cyan-400">{campusBuildings.length} on campus · {campusClassification.inCampus.length} units</span>
         </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 font-[var(--font-mono)] text-[11px]">
-          {CAMPUS_BUILDINGS.map(b => (
-            <div
-              key={b.id}
-              onClick={() => {
-                setSelectedBuilding(b.name);
-                if (onSelectBuilding) {
-                  onSelectBuilding(b.id, b.name);
-                }
-                if (!isViewLockedRef.current && mapRef.current) {
-                  fitBuildingBounds(b);
-                }
-              }}
-              className="flex items-center space-x-1.5 cursor-pointer hover:text-white text-slate-300 transition-colors"
+        <div className="space-y-1.5 font-[var(--font-mono)] text-[11px] max-h-48 overflow-y-auto">
+          {campusBuildings.map(b => {
+            const group = buildingGroups[b.id];
+            const s = group?.status ?? { total: 0, healthy: 0, attention: 0, critical: 0 };
+            const isSelected = selectedBuilding === b.name;
+            return (
+              <div
+                key={b.id}
+                onClick={() => {
+                  setSelectedBuilding(isSelected ? 'ALL' : b.name);
+                  if (onSelectBuilding) {
+                    if (isSelected) onSelectBuilding(null, null);
+                    else onSelectBuilding(b.id, b.name);
+                  }
+                  if (!isViewLockedRef.current && mapRef.current && !isSelected) {
+                    fitBuildingBounds(b);
+                  }
+                }}
+                className={`flex items-center justify-between cursor-pointer px-1.5 py-1 transition-colors border border-transparent ${
+                  isSelected
+                    ? 'bg-[var(--color-steel-blue)]/20 border-[var(--color-command-border)] text-white'
+                    : 'hover:bg-[var(--color-steel-blue)]/10 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-none flex-shrink-0" style={{ backgroundColor: b.color }}></span>
+                  <span className="truncate" title={b.name}>{b.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  {s.healthy > 0 && (
+                    <span className="flex items-center text-[10px] text-emerald-400">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-0.5"></span>
+                      {s.healthy}
+                    </span>
+                  )}
+                  {s.attention > 0 && (
+                    <span className="flex items-center text-[10px] text-amber-400">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-0.5"></span>
+                      {s.attention}
+                    </span>
+                  )}
+                  {s.critical > 0 && (
+                    <span className="flex items-center text-[10px] text-red-400">
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-0.5"></span>
+                      {s.critical}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-400 font-bold ml-0.5">{s.total}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Out-of-campus toggle */}
+        {campusClassification.outOfCampus.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-[var(--color-command-border)]">
+            <button
+              onClick={() => setShowOutOfCampus(prev => !prev)}
+              className={`w-full flex items-center justify-between px-1.5 py-1 text-[10px] font-[var(--font-mono)] uppercase tracking-wider transition-colors cursor-pointer border ${
+                showOutOfCampus
+                  ? 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+                  : 'text-slate-500 border-transparent hover:text-slate-400 hover:border-[var(--color-command-border)]'
+              }`}
             >
-              <span className="w-2.5 h-2.5 rounded-none flex-shrink-0" style={{ backgroundColor: b.color }}></span>
-              <span className="truncate" title={b.name}>{b.name}</span>
-            </div>
-          ))}
-        </div>
+              <span className="flex items-center gap-1">
+                {showOutOfCampus ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                Out-of-Campus ({campusClassification.outOfCampus.length})
+              </span>
+              <span className="text-[9px]">{showOutOfCampus ? 'SHOWN' : 'HIDDEN'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Floating Status Legend */}
+      {/* Floating Status Legend + Boundary Indicator */}
       <div className="absolute bottom-4 right-4 z-10 pointer-events-auto bg-[var(--color-command-panel)]/90 backdrop-blur-md border border-[var(--color-command-border)] p-2.5 shadow-xl flex items-center space-x-4 font-[var(--font-mono)] text-xs">
         <div className="flex items-center">
           <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-1.5"></span>
@@ -914,6 +1043,11 @@ export const MapboxCampusMap: React.FC<MapboxCampusMapProps> = ({
         <div className="flex items-center">
           <span className="w-2.5 h-2.5 bg-red-500 rounded-full mr-1.5"></span>
           <span className="text-slate-200">Emergency</span>
+        </div>
+        <div className="h-3 w-[1px] bg-[var(--color-command-border)]"></div>
+        <div className="flex items-center">
+          <span className="w-4 h-[2px] mr-1.5" style={{ borderTop: '2px dashed #22d3ee' }}></span>
+          <span className="text-cyan-400 text-[10px]">Boundary</span>
         </div>
       </div>
     </div>

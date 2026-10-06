@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getExtinguishers, getLocations, getRecentTelemetry } from '../api';
 import { WS_URL } from '../env';
 import type { Extinguisher, Location } from '../types';
-import { Flame, Activity, ShieldAlert, Wrench, Archive, MapPin, Radio, Wifi, WifiOff } from 'lucide-react';
+import { Flame, Activity, ShieldAlert, Wrench, Archive, MapPin, Radio } from 'lucide-react';
 import { Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -21,7 +21,7 @@ const Dashboard = () => {
   const [extinguishers, setExtinguishers] = useState<Extinguisher[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [liveEvents, setLiveEvents] = useState<any[]>([]);
-  const [wsStatus, setWsStatus] = useState<'CONNECTED' | 'CONNECTING' | 'DISCONNECTED'>('CONNECTING');
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
 
@@ -37,12 +37,12 @@ const Dashboard = () => {
 
     // WebSocket setup with resilient auto-reconnect
     const connectWs = () => {
-      setWsStatus('CONNECTING');
+
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        setWsStatus('CONNECTED');
+
       };
 
       ws.onmessage = (event) => {
@@ -67,7 +67,7 @@ const Dashboard = () => {
       };
 
       ws.onclose = () => {
-        setWsStatus('DISCONNECTED');
+
         reconnectTimeoutRef.current = setTimeout(connectWs, 3000);
       };
 
@@ -188,22 +188,8 @@ const Dashboard = () => {
               <h2 className="font-[var(--font-nav)] text-sm tracking-widest uppercase text-[#E2E8F0]">Live Telemetry Feed</h2>
             </div>
             <div className="flex items-center space-x-2">
-              {wsStatus === 'CONNECTED' ? (
-                <>
                   <span className="w-2.5 h-2.5 bg-[var(--color-success-teal)] animate-pulse rounded-full shadow-[0_0_8px_var(--color-success-teal)]"></span>
                   <span className="text-[var(--color-success-teal)] font-[var(--font-mono)] text-xs tracking-wider">SOCKET CONNECTED (LIVE)</span>
-                </>
-              ) : wsStatus === 'CONNECTING' ? (
-                <>
-                  <span className="w-2.5 h-2.5 bg-[var(--color-amber-alert)] animate-pulse rounded-full"></span>
-                  <span className="text-[var(--color-amber-alert)] font-[var(--font-mono)] text-xs tracking-wider">CONNECTING...</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2.5 h-2.5 bg-[var(--color-red-critical)] rounded-full"></span>
-                  <span className="text-[var(--color-red-critical)] font-[var(--font-mono)] text-xs tracking-wider">SOCKET OFFLINE (RECONNECTING)</span>
-                </>
-              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-[var(--color-command-bg)] max-h-[420px]">

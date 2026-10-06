@@ -1,0 +1,44 @@
+# Render.com Blueprint — FireTwin AI Backend
+# https://render.com/docs/blueprint-spec
+#
+# Deploy with: Render Dashboard → New → Blueprint → connect this repo
+
+databases:
+  - name: firetwin-db
+    plan: free
+    databaseName: firetwin_db
+    user: firetwin
+
+services:
+  # ── Backend (FastAPI + Docker) ─────────────────────────────────
+  - type: web
+    name: firetwin-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /docs
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: firetwin-db
+          property: connectionURI
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REFRESH_SECRET
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: CORS_ORIGINS
+        # UPDATE THIS after Vercel deploy with your actual frontend URL
+        value: https://fire-twin-sys.vercel.app
+      - key: MQTT_BROKER
+        value: ""
+      - key: MQTT_PORT
+        value: "1883"
