@@ -1,5 +1,5 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
@@ -120,7 +120,7 @@ def seed_data():
             role="super_admin",
             status="active",
             is_active=True,
-            created_at=datetime.utcnow() - timedelta(days=60)
+            created_at=datetime.now(timezone.utc) - timedelta(days=60)
         )
         operator_user = models.User(
             email="operator@firetwin.edu",
@@ -129,7 +129,7 @@ def seed_data():
             role="admin",
             status="active",
             is_active=True,
-            created_at=datetime.utcnow() - timedelta(days=30)
+            created_at=datetime.now(timezone.utc) - timedelta(days=30)
         )
         tech_user = models.User(
             email="tech@firetwin.edu",
@@ -138,7 +138,7 @@ def seed_data():
             role="technician",
             status="active",
             is_active=True,
-            created_at=datetime.utcnow() - timedelta(days=45)
+            created_at=datetime.now(timezone.utc) - timedelta(days=45)
         )
         db.add_all([admin_user, operator_user, tech_user])
         db.commit()
@@ -304,9 +304,9 @@ def seed_data():
                         pressure = round(random.uniform(12.0, 24.0), 1)
                         battery = round(random.uniform(15.0, 40.0), 1)
 
-                    install_date = datetime.utcnow() - timedelta(days=random.randint(120, 800))
+                    install_date = datetime.now(timezone.utc) - timedelta(days=random.randint(120, 800))
                     expiry_date = install_date + timedelta(days=365 * 5)
-                    last_insp = datetime.utcnow() - timedelta(days=random.randint(5, 60))
+                    last_insp = datetime.now(timezone.utc) - timedelta(days=random.randint(5, 60))
                     next_insp = last_insp + timedelta(days=180)
 
                     e_type = random.choice(ext_types)
@@ -370,9 +370,9 @@ def seed_data():
                 s_pressure = 95.0
                 s_battery = round(random.uniform(60.0, 85.0), 1)
 
-            install_date = datetime.utcnow() - timedelta(days=random.randint(30, 365))
+            install_date = datetime.now(timezone.utc) - timedelta(days=random.randint(30, 365))
             expiry_date = install_date + timedelta(days=365 * 5)
-            last_insp = datetime.utcnow() - timedelta(days=random.randint(10, 45))
+            last_insp = datetime.now(timezone.utc) - timedelta(days=random.randint(10, 45))
 
             spare_ext = models.FireExtinguisher(
                 extinguisher_id=f"FE-SPARE-{2001 + i}",
@@ -418,7 +418,7 @@ def seed_data():
                 tilt=False,
                 availability=True,
                 device_health="Good" if ext.status == "Healthy" else "Warning",
-                timestamp=datetime.utcnow() - t_offset
+                timestamp=datetime.now(timezone.utc) - t_offset
             )
             readings.append(reading)
         
