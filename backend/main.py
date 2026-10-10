@@ -11,8 +11,13 @@ import asyncio
 import random
 
 def init_db_schema():
-    from database import engine
+    from database import engine, Base
     from sqlalchemy import text, inspect
+    import models # Ensure models are loaded
+    
+    # Create tables if they don't exist
+    Base.metadata.create_all(bind=engine)
+    
     with engine.connect() as conn:
         try:
             inspector = inspect(engine)
